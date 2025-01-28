@@ -647,6 +647,12 @@ export class Client {
         }
     }
 
+    // Helper function to check if a directory is protected
+    isProtected(path: string): boolean {
+        // Normalize paths for comparison (adjust based on FTP server behavior)
+        return this.protectedDirs.some(protectedDir => path === protectedDir)
+    }
+
     /**
      * Upload the contents of a local directory to the remote working directory.
      *
@@ -751,12 +757,6 @@ export class Client {
     async removeEmptyDir(path: string): Promise<FTPResponse> {
         const validPath = await this.protectWhitespace(path)
         return this.send(`RMD ${validPath}`)
-    }
-
-    // Helper function to check if a directory is protected
-    isProtected(path: string): boolean {
-        // Normalize paths for comparison (adjust based on FTP server behavior)
-        return this.protectedDirs.some(protectedDir => path === protectedDir)
     }
 
     /**
