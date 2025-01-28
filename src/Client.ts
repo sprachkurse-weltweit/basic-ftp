@@ -630,6 +630,11 @@ export class Client {
      */
     async clearWorkingDir(): Promise<void> {
         for (const file of await this.list()) {
+            const validPath = await this.protectWhitespace(file.name)
+            if (this.isProtected(validPath)) {
+                console.log(`[FTP] Skipping protected directory: ${validPath}`)
+                continue  // If the directory is protected, skip it
+            }
             if (file.isDirectory) {
                 await this.cd(file.name)
                 await this.clearWorkingDir()
@@ -743,12 +748,8 @@ export class Client {
     /**
      * Remove an empty directory, will fail if not empty.
      */
-    async removeEmptyDir(path: string): Promise<FTPResponse | void> {
+    async removeEmptyDir(path: string): Promise<FTPResponse> {
         const validPath = await this.protectWhitespace(path)
-        if (this.isProtected(validPath)) {
-            console.log(`[FTP] Skipping protected directory: ${validPath}`)
-            return  // If the directory is protected, skip it
-        }
         return this.send(`RMD ${validPath}`)
     }
 
