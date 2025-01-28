@@ -64,6 +64,9 @@ export class Client {
     /** Tracks progress of data transfers. */
     protected _progressTracker: ProgressTracker
 
+    // Add protectedDirs to track protected directories
+    private protectedDirs: string[]
+
     /**
      * Instantiate an FTP client.
      *
@@ -74,6 +77,12 @@ export class Client {
         this.prepareTransfer = this._enterFirstCompatibleMode([enterPassiveModeIPv6, enterPassiveModeIPv4])
         this.parseList = parseListAutoDetect
         this._progressTracker = new ProgressTracker()
+        this.protectedDirs = []
+    }
+
+    // Set protected directories dynamically
+    setProtectedDirs(dirs: string[]): void {
+        this.protectedDirs = dirs;
     }
 
     /**
@@ -172,7 +181,7 @@ export class Client {
     sendIgnoringError(command: string): Promise<FTPResponse> {
         return this.ftp.handle(command, (res, task) => {
             if (res instanceof FTPError) {
-                task.resolve({code: res.code, message: res.message})
+                task.resolve({ code: res.code, message: res.message })
             }
             else if (res instanceof Error) {
                 task.reject(res)
@@ -508,7 +517,7 @@ export class Client {
         try {
             return await this._downloadToStream(destination, remotePath, startAt)
         }
-        catch(err) {
+        catch (err) {
             const localFileStats = await ignoreError(() => fsStat(localPath))
             const hasDownloadedData = localFileStats && localFileStats.size > 0
             const shouldRemoveLocalFile = !appendingToLocalFile && !hasDownloadedData
@@ -561,7 +570,7 @@ export class Client {
             try {
                 const parsedList = await this._requestListWithCommand(command)
                 // Use successful candidate for all subsequent requests.
-                this.availableListCommands = [ candidate ]
+                this.availableListCommands = [candidate]
                 return parsedList
             }
             catch (err) {
@@ -734,9 +743,19 @@ export class Client {
     /**
      * Remove an empty directory, will fail if not empty.
      */
-    async removeEmptyDir(path: string): Promise<FTPResponse> {
+    async removeEmptyDir(path: string): Promise<FTPResponse | void> {
         const validPath = await this.protectWhitespace(path)
+        if (this.isProtected(validPath)) {
+            console.log(`[FTP] Skipping protected directory: ${validPath}`)
+            return  // If the directory is protected, skip it
+        }
         return this.send(`RMD ${validPath}`)
+    }
+
+    // Helper function to check if a directory is protected
+    isProtected(path: string): boolean {
+        // Normalize paths for comparison (adjust based on FTP server behavior)
+        return this.protectedDirs.some(protectedDir => path === protectedDir)
     }
 
     /**
@@ -783,7 +802,7 @@ export class Client {
                     this.prepareTransfer = strategy // eslint-disable-line require-atomic-updates
                     return res
                 }
-                catch(err: any) {
+                catch (err: any) {
                     // Try the next candidate no matter the exact error. It's possible that a server
                     // answered incorrectly to a strategy, for example a PASV answer to an EPSV.
                     lastError = err
@@ -843,7 +862,7 @@ async function ensureLocalDirectory(path: string) {
     try {
         await fsStat(path)
     }
-    catch(err) {
+    catch (err) {
         await fsMkDir(path, { recursive: true })
     }
 }
@@ -852,7 +871,7 @@ async function ignoreError<T>(func: () => Promise<T | undefined>) {
     try {
         return await func()
     }
-    catch(err) {
+    catch (err) {
         // Ignore
         return undefined
     }
